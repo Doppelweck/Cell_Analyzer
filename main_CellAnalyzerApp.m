@@ -48,6 +48,7 @@ try %Try to run the application
     set( findall(mainFig,'ToolTipString','Link Plot') ,'Visible','Off');
     set( findall(mainFig,'ToolTipString','Save Figure') ,'Visible','Off');
     set( findall(mainFig,'ToolTipString','Open File') ,'Visible','Off');
+   
     
     % Init View Classes
     viewHandle = viewCellAnalyzer(mainFig);

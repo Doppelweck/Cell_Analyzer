@@ -30,7 +30,7 @@ classdef modelCellAnalyzer < handle
             obj.Data.HandleFrameROI = []; 
             
             obj.CellData.NoCells = [];
-            obj.CellData.Mask = [];
+            obj.CellData.Masks = [];
             obj.CellData.RefMask = []; %Background
             obj.CellData.Labels = [];
             obj.CellData.Boundaries = [];
@@ -39,8 +39,10 @@ classdef modelCellAnalyzer < handle
             obj.CellData.CurVideoLength = [];
             obj.CellData.Stats = [];
             obj.CellData.Intensities = [];
+            obj.CellData.IntensitiesSmoothed = [];
             obj.CellData.StimulationSignal = [];
             obj.CellData.BackgroundSignal = [];
+            obj.CellData.BackgroundSignalSmoothed = [];
             obj.CellData.HandleFrameAnalyzed = [];
             obj.CellData.TableCellOptions = {};
             obj.CellData.ColorOrder = [      0    0.4470    0.7410;...
@@ -113,7 +115,7 @@ classdef modelCellAnalyzer < handle
             obj.Data.CurVideoLength = [hh ':' mm ':' ss];
             obj.CellData.CurVideoLength = [hh ':' mm ':' ss];
             
-% %             obj.frameStabilisation();
+            obj.frameStabilisation(false);
             
             %Open File for Stimulation Signal
             if ~isempty(obj.Data.FileNameStimu)
@@ -156,48 +158,79 @@ classdef modelCellAnalyzer < handle
             
             % Calculate mean Intesities for all Cells and Frames
             obj.getCellProperties();
+            
 
         end
         
         function createMaskFromROIs(obj)
+            %Create i-Masks for i-ROIs
             
                 obj.CellData.NoCells = [];
-                obj.CellData.Mask = [];
+                obj.CellData.Masks = [];
                 obj.CellData.Labels = [];
                 obj.CellData.Boundaries = [];
                 obj.CellData.Handle2Boundaries = [];
-            
-                idxOK = find(isvalid([obj.Data.ROI{:}]));
-                idxNotOK = find(~isvalid([obj.Data.ROI{:}]));
+                
+                idxOK=[];
+                idxNotOK=[];
+                
+                for i=1:size(obj.Data.ROI,2)
+                idxOK(end+1)=0;
+                idxOK(end) = find(isvalid(obj.Data.ROI{1,i}))*i;
+                
+                idxNotOK(end+1)=0;
+                if isempty(find(~isvalid(obj.Data.ROI{1,i}))*i)
+                    idxNotOK(end) = [];
+                end
+                end
                 obj.Data.ROI(idxNotOK) = [];
+                
+                
                 
             if ~isempty(idxOK)
                 
                 NoROI = size(obj.Data.ROI,2);
                 
-                Mask = logical(zeros(size(obj.Data.FramesOrigin{1,1})));
+                Mask = logical(zeros(size(obj.Data.FramesStable{1,1})));
                 
                 for i=1:1:NoROI
-                    tempMask = createMask(obj.Data.ROI{1,i});
-                    Mask(tempMask)=1;
+                    %%tempMask = createMask(obj.Data.ROI{1,i});
+                    %%Mask(tempMask)=1;
+                    
+                    %Save ervery Mask from ROI
+                    obj.CellData.Masks{i} = createMask(obj.Data.ROI{1,i});
+                    
+                    %Create Label and Boundarie Mats
+                    [Bounds Label] = bwboundaries(obj.CellData.Masks{i},8,'noholes');
+                    obj.CellData.Boundaries{i} = Bounds;
+                    obj.CellData.Label = i;
                 end
                 
-                %Create Label and Boundarie Mat
-                [Bounds Label] = bwboundaries(Mask,8,'noholes');
-                
                 obj.CellData.NoCells = NoROI;
-                obj.CellData.Mask = Mask;
-                obj.CellData.Labels = Label;
-                obj.CellData.Boundaries = Bounds;
-                
                 
             else %No ROIs selected
             end
             
-            %Create Mask for Referece Background
+            %Create Mask for Referece Background. One mask for every
+            %Background ROI
             if ~isempty(obj.Data.RefROI)
-                idxOK = find(isvalid([obj.Data.RefROI{:}]));
-                idxNotOK = find(~isvalid([obj.Data.RefROI{:}]));
+                
+                idxOK=[];
+                idxNotOK=[];
+                
+                for i=1:size(obj.Data.RefROI,2)
+                idxOK(end+1)=0;
+                idxOK(end) = find(isvalid(obj.Data.RefROI{1,i}))*i;
+                
+                idxNotOK(end+1)=0;
+                if isempty(find(~isvalid(obj.Data.RefROI{1,i}))*i)
+                    idxNotOK(end) = [];
+                end
+                end
+                obj.Data.ROI(idxNotOK) = [];
+                
+%                 idxOK = find(isvalid([obj.Data.RefROI{:}]));
+%                 idxNotOK = find(~isvalid([obj.Data.RefROI{:}]));
 
             obj.Data.RefROI(idxNotOK) = [];
             
@@ -219,6 +252,23 @@ classdef modelCellAnalyzer < handle
                
         end
         
+        function smoothData(obj,method,span)
+            switch method
+                case 'no smoothing'
+                    obj.CellData.IntensitiesSmoothed = obj.CellData.Intensities;
+                    obj.CellData.BackgroundSignalSmoothed = obj.CellData.BackgroundSignal;
+                case 'moving average'
+                for i=1:size(obj.CellData.IntensitiesSmoothed,1)
+%                     obj.CellData.IntensitiesSmoothed(i,:)= smooth(obj.CellData.Intensities(i,:),method,span);
+                   obj.CellData.IntensitiesSmoothed(i,:)= conv(obj.CellData.Intensities(i,:), ones(round(span),1)/round(span), 'same');
+                end
+                for i=1:size(obj.CellData.BackgroundSignalSmoothed,1)
+%                     obj.CellData.IntensitiesSmoothed(i,:)= smooth(obj.CellData.Intensities(i,:),method,span);
+                   obj.CellData.BackgroundSignalSmoothed(i,:)= conv(obj.CellData.BackgroundSignal(i,:), ones(round(span),1)/round(span), 'same');
+                end
+            end
+        end
+        
         function getCellProperties(obj)
             
             
@@ -228,100 +278,153 @@ classdef modelCellAnalyzer < handle
                 
                 %Get Background Signal
                 if ~isempty(obj.CellData.RefMask)
-                    obj.CellData.BackgroundSignal(i) = mean(obj.Data.FramesOrigin{i}(obj.CellData.RefMask==1));
+                    obj.CellData.BackgroundSignal(i) = mean(obj.Data.FramesStable{i}(obj.CellData.RefMask==1));
                 else
                     obj.CellData.BackgroundSignal = [];
                 end
+                 obj.CellData.BackgroundSignalSmoothed = obj.CellData.BackgroundSignal;
                 
                 %Get Cell Signal
-                tempStruct = regionprops('struct',obj.CellData.Labels,obj.Data.FramesOrigin{i},'MeanIntensity','Centroid');
-                tempMat(:,i) = [tempStruct.MeanIntensity];
-                %                 [obj.CellData.Stats(:).meanIntensity] = deal(meanIntens.MeanIntensity);
+                
+                for j=1:1:obj.CellData.NoCells
+                    frame = i;
+                    cell = j;
+                    
+                    tempStruct = regionprops('struct',obj.CellData.Masks{j},obj.Data.FramesStable{i},'MeanIntensity','Centroid');
+                    tempMat(cell,frame) = [tempStruct.MeanIntensity];
+                    %                 [obj.CellData.Stats(:).meanIntensity] = deal(meanIntens.MeanIntensity);
+                    
+                    obj.CellData.Stats(j).Centroid = tempStruct.Centroid;
+                end
+                
+                workbar(i/obj.Data.NoFrames, 'get Cell Data', 'Calculating Cell Data',obj.hController.hFigure);
             end
             obj.CellData.Intensities = tempMat;
-            obj.CellData.Stats = tempStruct;
+            obj.CellData.IntensitiesSmoothed = tempMat;
+            
+            meanCells = mean(tempMat,1);
+            %[y,yfit] = bf(meanCells.','confirm','linear');
+            
+%             % Filter parameters
+%             fc = 0.5;     % fc : cut-off frequency (cycles/sample)
+%             d = 2;          % d : filter order parameter (d = 1 or 2)
+%             
+%             % Positivity bias (peaks are positive)
+%             r = 6;          % r : asymmetry parameter
+%             
+%             % Regularization parameters
+%             amp = 0.4;
+%             lam0 = 0.5*amp;
+%             lam1 = 5*amp;
+%             lam2 = 4*amp;
+%             
+%             ylim1 = [0 max(meanCells)];
+%             xlim1 = [0 length(meanCells)];
+%             N = length(meanCells);
+%             meanCells = meanCells.';
+%             
+%             [x1, f1, cost] = beads(meanCells, d, fc, r, lam0, lam1, lam2);
+%             %%obj.CellData.Stats = tempStruct;
+%             figure(100)
+%             clf
+%             
+%             subplot(4, 1, 1)
+%             plot(meanCells)
+%             title('Data')
+%             xlim(xlim1)
+%             ylim(ylim1)
+%             set(gca,'ytick', ylim1)
+%             
+%             subplot(4, 1, 2)
+%             plot(meanCells,'color', [1 1 1]*0.7)
+%             line(1:N, f1, 'LineWidth', 1)
+%             legend('Data', 'Baseline')
+%             legend boxoff
+%             title(['Baseline, as estimated by BEADS', ' (r = ', num2str(r), ', fc = ', num2str(fc), ', d = ', num2str(d),')'])
+%             xlim(xlim1)
+%             ylim(ylim1)
+%             set(gca,'ytick', ylim1)
+%             
+%             subplot(4, 1, 3)
+%             plot(x1)
+%             title('Baseline-corrected data')
+%             xlim(xlim1)
+%             ylim(ylim1)
+%             set(gca,'ytick', ylim1)
+%             
+%             
+%             subplot(4, 1, 4)
+%             plot(meanCells - x1 - f1)
+%             title('Residual')
+%             xlim(xlim1)
+%             ylim(ylim1)
+%             set(gca,'ytick', ylim1)
+%             
+%             orient tall
+%             print -dpdf example
             
         end
         
-        function frameStabilisation(obj)
+        function frameStabilisation(obj,active)
+            
+            if active
+            
+            % Set alignment parameters
+            alignIteration = 20; % number of iterationsS
+            init_warp_value = 5;  %initialization of shift for correlation
+            NoL = 1;  % number of pyramid-levels %it's not working --> set to 1
+            transform = 'translation'; % Method of transformation --> only translation is working
+            
+
             obj.Data.FramesStable = [];
-            obj.Data.FramesStable{1} = obj.Data.FramesOrigin{1};
+            obj.Data.FramesStable{1} = double(obj.Data.FramesOrigin{1});
+            
+            %Assignment of first image as template
+            template_image=double(obj.Data.FramesOrigin{1});
+            imageCellaligned{1} = double(obj.Data.FramesOrigin{1});
+            
+            init_warp = [init_warp_value;init_warp_value];
+            NoI = 2*alignIteration;
+            
             for i=2:1:obj.Data.NoFrames
                 percent =   (i)/obj.Data.NoFrames;
                 workbar(percent,'Please Wait...stabilization of video frames','Frame Stabilization',obj.hController.hFigure);
                 
-                NoOfMatches = 0; %Numer of Mathcing Points between two frames
-                ptThresh = 0.01;
-                Search = true;
-                Searchiteration = 0;
-                while(NoOfMatches < 1 && Search)
-                    
-                    pointsA = detectBRISKFeatures(obj.Data.FramesOrigin{i-1},'MinContrast',0.1);
-                    pointsB = detectBRISKFeatures(obj.Data.FramesOrigin{i},'MinContrast',0.1);
-                    
-                    figure; showMatchedFeatures(obj.Data.FramesOrigin{i-1}, obj.Data.FramesOrigin{i}, pointsA, pointsB);
-                    legend('A', 'B');
-                    %             figure; imshow(modelHandle.Data.FramesOrigin{1},[]); hold on;
-                    %             plot(pointsA);
-                    %             title('Corners in A');
-                    
-                    %             figure; imshow(modelHandle.Data.FramesOrigin{2},[]); hold on;
-                    %             plot(pointsB);
-                    %             title('Corners in B');
-                    
-                    % Extract FREAK descriptors for the corners
-                    [featuresA, pointsA] = extractFeatures(obj.Data.FramesOrigin{i-1}, pointsA);
-                    [featuresB, pointsB] = extractFeatures(obj.Data.FramesOrigin{i}, pointsB);
-                    
-                    indexPairs = matchFeatures(featuresA, featuresB);
-                    
-                    pointsA = pointsA(indexPairs(:, 1), :);
-                    pointsB = pointsB(indexPairs(:, 2), :);
-
-
-                    %Numer of Mathcing Points between two frames. Must be
-                    %greater or equal to 3
-                    NoOfMatches = size(indexPairs,1);
-                    ptThresh = ptThresh/2;
-                    
-                     Searchiteration = Searchiteration+1;
-                     
-%                      disp(Searchiteration/50)
-                     if Searchiteration > 1
-                         Search = false;
-                     end
-                    
-                    figure(); imshow(obj.Data.FramesOrigin{i-1},[]); hold on;
-                    plot(pointsA);
-                    title('Corners in A');
-                    
-                    figure; imshow(obj.Data.FramesOrigin{i},[]); hold on;
-                    plot(pointsB);
-                    title('Corners in B');
+                image_to_align=double(obj.Data.FramesOrigin{i});
+                [A,B,C]=size(image_to_align);
+                
+                % Convert image in grayscale and to type double
+                if C==3
+                    image_to_align=rgb2gray(image_to_align);
                 end
                 
-                if Search
-                pointsA = pointsA(indexPairs(:, 1), :);
-                pointsB = pointsB(indexPairs(:, 2), :);
-                
-                %             figure; showMatchedFeatures(modelHandle.Data.FramesOrigin{1}, modelHandle.Data.FramesOrigin{2}, pointsA, pointsB);
-                %             legend('A', 'B');
-                
-                try
-                [tform, pointsBm, pointsAm] = estimateGeometricTransform(pointsA, pointsB, 'affine');
-                imgBp = imwarp(obj.Data.FramesOrigin{i}, tform, 'OutputView', imref2d(size(obj.Data.FramesOrigin{i})));
-%                 pointsBmp = transformPointsForward(tform, pointsBm.Location);
-                obj.Data.FramesStable{i} = imgBp;
-                catch
-                    disp('jo')
+                do_align = 1;
+                while do_align > 0
+                    % Follwing function calculates the aligned image
+                    [results,  vec_final_warp(1:2,i), warped_image]=...
+                        ecc(image_to_align, template_image,NoL, NoI, transform, init_warp);
+                    % is there a high image shift two subsequent images the
+                    % number of correlation steps will be increased and image new
+                    % aligned
+                    if max(abs(vec_final_warp(:,i)-vec_final_warp(:,i-1))) > 2.5....
+                            && do_align < 2
+                        do_align = do_align+1;
+                        NoI = 2*alignIteration;
+                    else
+                        do_align = 0;
+                        NoI = alignIteration;
+                    end
                 end
-                obj.Data.FramesStable{i} = obj.Data.FramesOrigin{i};
-                %             figure;
-                %             showMatchedFeatures(modelHandle.Data.FramesOrigin{1}, imgBp, pointsAm, pointsBmp);
-                %             legend('A', 'B'); 
-                end
+                init_warp = vec_final_warp(1:2,i);  % new start values for next alignment
+                obj.Data.FramesStable{i} = warped_image; % aligned image in cell
+            end
+            
+            else %Frame Stabilisation is NOT active
+                
+                obj.Data.FramesStable = obj.Data.FramesOrigin;
                 
             end
+            
         end
         
         function clearAllData(obj)
@@ -340,7 +443,7 @@ classdef modelCellAnalyzer < handle
             obj.Data.HandleFrameROI = []; 
             
             obj.CellData.NoCells = [];
-            obj.CellData.Mask = [];
+            obj.CellData.Masks = [];
             obj.CellData.RefMask = [];
             obj.CellData.Labels = [];
             obj.CellData.Boundaries = [];

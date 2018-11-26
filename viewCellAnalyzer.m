@@ -67,6 +67,12 @@ classdef viewCellAnalyzer < handle
 %             tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);
 %             obj.hButton.New = uicontrol( 'Parent', tempBBox,'FontUnits','normalized','Fontsize',0.4, 'String', sprintf('\x2633 New file') );
             tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);
+            tempBox = uix.HButtonBox('Parent', tempBBox,'ButtonSize',[600 40],'Padding', 1 );
+            uicontrol( 'Parent', tempBox,'Style','text','FontUnits','normalized','Fontsize',0.6, 'HorizontalAlignment','left', 'String', 'Type of ROI:' );
+            tempBox = uix.HButtonBox('Parent', tempBBox,'ButtonSize',[600 40],'Padding', 1 );
+            obj.hButton.ROISelect = uicontrol( 'Parent', tempBox,'Style','popupmenu','FontUnits','normalized','Fontsize',0.6, 'String', {'Freehand' , 'Circular','Ploygon','Rectangle'} ,'Enable','on');
+            
+            tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);
             obj.hButton.AddROI = uicontrol( 'Parent', tempBBox,'FontUnits','normalized','Fontsize',0.4, 'String', sprintf('Add ROI') );
             tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);
             obj.hButton.AddRefROI = uicontrol( 'Parent', tempBBox,'FontUnits','normalized','Fontsize',0.4, 'String', sprintf('Add Ref. Region') );
@@ -149,6 +155,22 @@ classdef viewCellAnalyzer < handle
             VBoxControlElements = uix.VButtonBox('Parent', PanelControl1,'ButtonSize',[600 600],'Spacing', 0 );
             tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);
             obj.hButton.Back = uicontrol( 'Parent', tempBBox,'FontUnits','normalized','Fontsize',0.4, 'String', sprintf('Back Edit') );
+            tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);
+            obj.hButton.Save = uicontrol( 'Parent', tempBBox,'FontUnits','normalized','Fontsize',0.4, 'String', sprintf('Save') );
+            
+            tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);
+            tempBox = uix.HButtonBox('Parent', tempBBox,'ButtonSize',[600 40],'Padding', 1 );
+            uicontrol( 'Parent', tempBox,'Style','text','FontUnits','normalized','Fontsize',0.5, 'HorizontalAlignment','left', 'String', 'Smoothing Method' );
+            tempBox = uix.HButtonBox('Parent', tempBBox,'ButtonSize',[600 40],'Padding', 1 );
+            obj.hButton.SmoothingMethod = uicontrol( 'Parent', tempBox,'Style','popupmenu','FontUnits','normalized','Fontsize',0.6, 'String', {'no smoothing','moving average'} ,'Enable','on');
+            
+            tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);
+            tempBox = uix.HButtonBox('Parent', tempBBox,'ButtonSize',[600 40],'Padding', 1 );
+            uicontrol( 'Parent', tempBox,'Style','text','FontUnits','normalized','Fontsize',0.5, 'HorizontalAlignment','left', 'String', 'Smoothing Span' );
+            tempBox = uix.HButtonBox('Parent', tempBBox,'ButtonSize',[600 40],'Padding', 1 );
+            obj.hButton.SmoothingSpan = uicontrol( 'Parent', tempBox,'Style','edit','FontUnits','normalized','Fontsize',0.5, 'String', '2','Enable','on');
+            
+            
 %             tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);
 %             obj.hButton.AddROI = uicontrol( 'Parent', tempBBox,'FontUnits','normalized','Fontsize',0.4, 'String', sprintf('Add ROI') );
 %             tempBBox = uix.HButtonBox('Parent', VBoxControlElements,'ButtonSize',[600 60], 'Spacing',0);

@@ -22,9 +22,14 @@ classdef controllerCellAnalyzer < handle
             set(obj.hView.hButton.AddROI ,'Callback',@obj.addROIEvent);
             set(obj.hView.hButton.AddRefROI ,'Callback',@obj.addRefROIEvent);
             set(obj.hView.hButton.Analyze ,'Callback',@obj.startAnalyzeEvent);
+            set(obj.hView.hButton.DeleteROI ,'Callback',@obj.deleteAllROIs);
             
             set(obj.hView.hButton.playFrameROI ,'Callback',@obj.playVideoEvent);
             set(obj.hView.hButton.playFrameAnalyze ,'Callback',@obj.playVideoEvent);
+            
+            set(obj.hView.hButton.SmoothingMethod,'Callback',@obj.smoothDataEvent);
+            set(obj.hView.hButton.SmoothingSpan,'Callback',@obj.smoothDataEvent);
+            
             
             addlistener(obj.hView.hButton.sliderFrameROI, 'ContinuousValueChange',@obj.sliderVideoEvent);
             addlistener(obj.hView.hButton.sliderFrameAnalyze, 'ContinuousValueChange',@obj.sliderVideoEvent);
@@ -63,8 +68,9 @@ classdef controllerCellAnalyzer < handle
                 obj.hModel.openFile();
                 
                 %Set First Frame in GUI
+                
                 axes(obj.hView.hAxes.videoFrameROI)
-                obj.hModel.Data.HandleFrameROI = imshow(obj.hModel.Data.FramesOrigin{1},[0 2^obj.hModel.Data.BitDepth]);
+                obj.hModel.Data.HandleFrameROI = imshow(obj.hModel.Data.FramesStable{1},[0 2^obj.hModel.Data.BitDepth]);
                 axis on
                 colorbar(obj.hView.hAxes.videoFrameROI);
                 
@@ -150,7 +156,7 @@ classdef controllerCellAnalyzer < handle
                     CurFrame = obj.hModel.Data.CurrentFrame;
                     
                     if CurFrame < NoFrames
-                        obj.hModel.Data.HandleFrameROI.CData = obj.hModel.Data.FramesOrigin{CurFrame};
+                        obj.hModel.Data.HandleFrameROI.CData = obj.hModel.Data.FramesStable{CurFrame};
                         obj.hModel.Data.CurrentFrame = obj.hModel.Data.CurrentFrame + 1;
                         set(obj.hView.hButton.sliderFrameROI,'Value',obj.hModel.Data.CurrentFrame);
                         obj.updatePlayerInfo();
@@ -167,7 +173,7 @@ classdef controllerCellAnalyzer < handle
                     CurFrame = obj.hModel.CellData.CurrentFrame;
                     
                     if CurFrame < NoFrames
-                        obj.hModel.CellData.HandleFrameAnalyzed.CData = obj.hModel.Data.FramesOrigin{CurFrame};
+                        obj.hModel.CellData.HandleFrameAnalyzed.CData = obj.hModel.Data.FramesStable{CurFrame};
                         obj.hModel.CellData.CurrentFrame = obj.hModel.CellData.CurrentFrame + 1;
                         set(obj.hView.hButton.sliderFrameAnalyze,'Value',obj.hModel.CellData.CurrentFrame);
                         obj.updatePlayerInfo();
@@ -210,7 +216,16 @@ classdef controllerCellAnalyzer < handle
         end
         
         function addROIEvent(obj,src,evnt)
-            h = imfreehand(obj.hView.hAxes.videoFrameROI,'closed',1);
+            switch obj.hView.hButton.ROISelect.Value
+                case 1
+                    h = imfreehand(obj.hView.hAxes.videoFrameROI,'closed',1);
+                case 2
+                    h = imellipse(obj.hView.hAxes.videoFrameROI);
+                case 3
+                    h = impoly(obj.hView.hAxes.videoFrameROI);
+                case 4
+                    h = imrect(obj.hView.hAxes.videoFrameROI);
+            end
             
             if size(h,1) ~= 0
                 obj.hModel.Data.ROI{end+1} = h;
@@ -218,10 +233,40 @@ classdef controllerCellAnalyzer < handle
         end
         
         function addRefROIEvent(obj,src,evnt)
-            h = imfreehand(obj.hView.hAxes.videoFrameROI,'closed',1);
+            switch obj.hView.hButton.ROISelect.Value
+                case 1
+                    h = imfreehand(obj.hView.hAxes.videoFrameROI,'closed',1);
+                    setColor(h,'red');
+                case 2
+                    h = imellipse(obj.hView.hAxes.videoFrameROI);
+                    setColor(h,'red');
+                case 3
+                    h = impoly(obj.hView.hAxes.videoFrameROI);
+                    setColor(h,'red');
+                case 4
+                    h = imrect(obj.hView.hAxes.videoFrameROI);
+                    setColor(h,'red');
+            end
             
             if size(h,1) ~= 0
                 obj.hModel.Data.RefROI{end+1} = h;
+            end
+        end
+        
+        function deleteAllROIs(obj,src,evnt)
+            
+            if size(obj.hModel.Data.ROI,2)>0
+                for i=1:size(obj.hModel.Data.ROI,2)
+                    delete(obj.hModel.Data.ROI{1,i});
+                end
+                obj.hModel.Data.ROI=[];
+            end
+            
+            if size(obj.hModel.Data.RefROI,2)>0
+                for i=1:size(obj.hModel.Data.RefROI,2)
+                    delete(obj.hModel.Data.RefROI{1,i});
+                end
+                obj.hModel.Data.RefROI=[];
             end
         end
         
@@ -241,6 +286,8 @@ classdef controllerCellAnalyzer < handle
                 
                 %Display video Frame with ROIs
                 obj.updateROIbounds();
+                
+                obj.smoothDataEvent();
                 
                 obj.updateIntensPlot();
 %                 set(jtable,'CellEditCallback',@obj.tableValueEvent);
@@ -348,6 +395,18 @@ classdef controllerCellAnalyzer < handle
             
         end
         
+        function smoothDataEvent(obj,src,evnt)
+            method=obj.hView.hButton.SmoothingMethod.Value;
+            spanStr = obj.hView.hButton.SmoothingSpan.String;
+            span = str2double(spanStr);
+            
+            methodString =obj.hView.hButton.SmoothingMethod.String{method};
+
+            obj.hModel.smoothData(methodString,span);
+            
+            obj.updateIntensPlot();
+        end
+        
         function updateCellOptionsTable(obj)
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %Create Tabel for ROI selection
@@ -452,13 +511,15 @@ classdef controllerCellAnalyzer < handle
                 
                 %                     obj.hModel.CellData.Handle2Boundaries{i} = visboundaries(obj.hModel.CellData.Boundaries{1,1});
                 c = obj.hModel.CellData.Stats(i).Centroid;
-                htemp = line(obj.hView.hAxes.videoFrameAnalyze,obj.hModel.CellData.Boundaries{i,1}(:,2),obj.hModel.CellData.Boundaries{i, 1}(:,1),'Color',Color,'LineWidth',1.5);
+                axes(obj.hView.hAxes.videoFrameAnalyze);
+                htemp = line(obj.hModel.CellData.Boundaries{1,i}{1,1}(:,2),obj.hModel.CellData.Boundaries{1,i}{1,1}(:,1),'Color',Color,'LineWidth',1.5);
                 htext = text(c(1),c(2),num2str(i),'Color',Color,'FontSize',16);
                 set(htemp,'Tag',['boundLabel ' num2str(i)]);
                 set(htemp,'HitTest','off');
                 set(htext,'Tag',['boundText ' num2str(i)]);
                 set(htext,'HitTest','off');
                 obj.hModel.CellData.Handle2Boundaries{i} = htemp;
+                
             end
         end
         
@@ -471,7 +532,7 @@ classdef controllerCellAnalyzer < handle
             
             axes(obj.hView.hAxes.cellActivity)
             cla(obj.hView.hAxes.cellActivity)
-            Intesities =  obj.hModel.CellData.Intensities;
+            Intesities =  obj.hModel.CellData.IntensitiesSmoothed;
             Stimu = obj.hModel.CellData.StimulationSignal;
             Background = obj.hModel.CellData.BackgroundSignal;
             
@@ -514,6 +575,7 @@ classdef controllerCellAnalyzer < handle
                     set(h,'HitTest','on');
                 end
                 hold on
+                
             end
             cf = obj.hModel.CellData.CurrentFrame;
             maxValue = max(max(Intesities));
